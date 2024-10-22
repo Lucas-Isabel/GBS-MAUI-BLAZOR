@@ -1,0 +1,155 @@
+﻿@page "/importar-itens"
+@inject ImportController ImportController
+@using IMPORTADOR_CLIPSE.Controllers
+@using IMPORTADOR_CLIPSE.Models
+
+<body class="bg-dark font-weight-light text-white">
+    <br />
+    <div class="container card bg-dark">
+        <br />
+        <div class="jumbotron jumbotron-fluid bg-primary mb-0">
+            <div class="container">
+                <h1 class="display-5 strong-50">Importação dos Dados</h1>
+            </div>
+        </div>
+
+        <form id="importForm" method="POST" action="send">
+            <div class="row">
+                <div class="col-sm-8">
+                    <div class="form-group">
+                        <label for="tipoDeArquivo">Tipo de Arquivo:</label>
+                        <select @bind="tipoDeArquivo" class="form-control" id="tipoDeArquivo">
+                            <option value="MGV">ItensMGV</option>
+                            <option value="TXITENS">TXITENS</option>
+                            <option value="CADTXT">CADTXT</option>
+                            <option value="CSV">CSV</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-8">
+                    <div class="form-group">
+                        <InputFile OnChange="OnFileSelected" id="fileUpload" class="custom-file-input form-control" />
+                        @if (caminhoArquivo == null)
+                        {
+                            <label for="fileUpload" class="custom-file-label m-3">Selecionar Arquivo</label>
+                        }
+                        else
+                        {
+                            <label for="fileUpload" class="custom-file-label m-3">@caminhoArquivo</label>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="row" style="margin-top: 40px;">
+                <div class="col-sm-2">
+                    <div class="form-group d-flex">
+                        <button type="button" class="btn btn-success m-1" @onclick="ImportarItens" disabled="@isImporting">Importar</button>
+                        <br />
+                        <a class="btn btn-info m-1" href="/">Voltar</a>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        @if (isImporting)
+        {
+            <div class="d-flex justify-content-center">
+                <span class="loader-file"></span>
+            </div>
+        }
+        else @if (produtos != null && produtos.Count > 0)
+        {
+            <h4>Produtos Importados:</h4>
+            <ul class="list-group slide-down-enter slide-down-enter-active">
+                @foreach (var produto in produtos)
+                {
+                    <li class="list-group-item">
+                        <strong>PLU:</strong> @produto.Plu <br />
+                        <strong>Descrição:</strong> @produto.Descricao <br />
+                        <strong>Preço:</strong> @produto.Preco.ToString("C") <br />
+                        <strong>Validade:</strong> @produto.Validade
+                    </li>
+                }
+            </ul>
+        }
+        else if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <p style="color: red;">@errorMessage</p>
+        }
+        else if (!isImporting && count > 0)
+        {
+            <p>Nenhum produto foi importado.</p>
+            <p>Verifique o caminho e o formato do arquivo</p>
+        }
+
+        <div class="progress-bar mt-3" style="display:none; width: 100%; background-color: #f3f3f3; border-radius: 4px;">
+            <div class="progress bg-primary" id="progress" style="width: 0%; height: 24px; text-align: center; line-height: 24px; color: white;">0%</div>
+        </div>
+        <br />
+    </div>
+    <br />
+</body>
+
+@code {
+    private List<Produto> produtos = new();
+    private string caminhoArquivo;
+    private string tipoDeArquivo = "MGV";
+    private int count = 0;
+    private bool isImporting = false;
+    private string errorMessage;
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            var path = Path.Combine(Path.GetTempPath(), file.Name);
+            using (var stream = file.OpenReadStream())
+            using (var fileStream = new FileStream(path, FileMode.Create))
+            {
+                await stream.CopyToAsync(fileStream);
+            }
+            caminhoArquivo = path;
+        }
+    }
+
+    private async Task ImportarItens()
+    {
+        count++;
+        isImporting = true; // Indica que a importação está em andamento
+        errorMessage = null; // Limpa qualquer mensagem de erro anterior
+
+        if (!string.IsNullOrEmpty(caminhoArquivo))
+        {
+            try
+            {
+                var servico = ImportController.ObterServicoPorTipoDeArquivo(tipoDeArquivo);
+                produtos = await servico.LerItensDoArquivoAsync(caminhoArquivo);
+
+                if (produtos != null && produtos.Count > 0)
+                {
+                    await servico.ProcessarProdutosAsync(produtos);
+                }
+                else
+                {
+                    produtos = new List<Produto>(); // Limpa a lista se nenhum produto for encontrado
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Erro ao importar itens: {ex.Message}"; // Define a mensagem de erro
+            }
+            finally
+            {
+                isImporting = false; // Finaliza o estado de importação
+            }
+        }
+        else
+        {
+            errorMessage = "Nenhum arquivo selecionado."; // Define mensagem de erro caso nenhum arquivo seja selecionado
+            isImporting = false; // Finaliza o estado de importação
+        }
+    }
+}

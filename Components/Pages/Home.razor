@@ -1,0 +1,376 @@
+﻿@page "/"
+@using IMPORTADOR_CLIPSE.DB;
+@using System.Diagnostics;
+@using IMPORTADOR_CLIPSE.Models
+@inject DataBaseService _databaseService
+@inject IJSRuntime JSRuntime
+
+<body class="bg-dark">
+    <br>
+    <div class="container">
+        <section class="card">
+            <table class="table table-striped table-dark table-hover mb-0">
+                <thead>
+                    <tr style="text-align: center;">
+                        <th colspan="5">Tabela de Produtos</th>
+                        <th>
+                            <input id="searchPluDescription"
+                                   class="form-control mr-2"
+                                   style="width: 15rem;"
+                                   type="text"
+                                   maxlength="15"
+                                   placeholder="Descrição"
+                                   @oninput="async (e) => await OnSearchInputChanged(e.Value.ToString())">
+                        </th>
+                        <th colspan="4" class="d-flex flex-row">
+                            <input id="searchPlu" class="form-control mr-2" style="width: 6rem;" type="number" max="200"
+                                   placeholder="código">
+                            <button class="btn btn-primary mr-2" @onclick="ScrollToId">
+                                <i class="bi bi-search"></i>
+                            </button>
+                            <button class="btn btn-primary" @onclick="ExibeNew">
+                                <i class="">+</i>
+                            </button>
+                        </th>
+                    </tr>
+                </thead>
+            </table>
+            <table class="table table-striped table-dark table-hover mb-0">
+                <thead>
+                    <tr style="text-align: center;">
+                        <th></th>
+                        <th>Codigo</th>
+                        <th>Descrição</th>
+                        <th>Preço</th>
+                        <th>Venda</th>
+                        <th>Validade</th>
+                        <th>Excluir</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (showNewPlu)
+                    {
+                        <tr>
+                            <td></td>
+                            <td>
+                                <input @bind="newPlu" required class="form-control @(newPlu <= 0 || newPlu > 200 ? "is-invalid" : "is-valid")"
+                                       style="width: 5rem;" type="number" min="1" max="200">
+                                <div class="invalid-feedback">O PLU deve ser um número entre 1 e 200.</div>
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center">
+                                <input @bind="newDescricao" required class="form-control @(string.IsNullOrWhiteSpace(newDescricao) ? "is-invalid" : "is-valid")"
+                                       style="width: 10rem;" maxlength="15">
+                                <div class="invalid-feedback">A descrição é obrigatória e deve ter no máximo 15 caracteres.</div>
+                                </div>
+                            </td>
+                            <td>
+                                <input @bind="newPreco" required class="form-control @(newPreco <= 0 || newPreco > 999.99 ? "is-invalid" : "is-valid")"
+                                       style="width: 7rem;" type="number" min="0.01" max="999.99" step="0.01">
+                                <div class="invalid-feedback">O preço deve ser entre 0.01 e 999.99.</div>
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center">
+                                <select @bind="newVenda" class="form-control">
+                                    <option value="0">Pesavel</option>
+                                    <option value="1">Unitario</option>
+                                </select>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center">
+                                <input @bind="newValidade" required class="form-control @(newValidade < 0 || newValidade > 200 ? "is-invalid" : "is-valid")"
+                                       style="width: 6rem;" type="number" min="0" max="200">
+                                <div class="invalid-feedback">A validade deve estar entre 0 e 200.</div>
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-primary" @onclick="SalvarNovo">Salvar</button>
+                            </td>
+                        </tr>
+                    }
+
+                    @foreach (var produto in produtos)
+                    {
+                        <tr style="text-align: center;" id="row-@produto.Plu">
+                            <td>
+                                @if (produto.Plu == produtoEmEdicao?.Plu)
+                                {
+                                    <button @onclick="() => SalvarEdicao(produto.Plu)" class="btn btn-success">
+                                        <i class="bi bi-save2"></i>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button @onclick="() => Editar(produto)" class="btn btn-warning">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                }
+                            </td>
+                            <td id="@produto.Plu">@produto.Plu</td>
+                            <td id="descricao-@produto.Plu" class="descricao-todos-produtos">
+                                <div class="d-flex justify-content-center">
+                                @if (produto.Plu == produtoEmEdicao?.Plu)
+                                {
+                                    <input @bind="produtoEmEdicao.Descricao" required class="form-control @(string.IsNullOrWhiteSpace(produtoEmEdicao.Descricao) ? "is-invalid" : "is-valid")"
+                                           style="width: 10rem;" maxlength="15">
+                                    <div class="invalid-feedback">A descrição é obrigatória.</div>
+                                }
+                                else
+                                {
+                                    @produto.Descricao
+                                }
+                                </div>
+                            </td>
+                            <td class="justify-content-center">
+                                @if (produto.Plu == produtoEmEdicao?.Plu)
+                                {
+                                    <input @bind="produtoEmEdicao.Preco" class="form-control @(produtoEmEdicao.Preco <= 0 || produtoEmEdicao.Preco > 999.99 ? "is-invalid" : "is-valid")"
+                                           style="width: 7rem;" type="number" min="0.01" max="999.99" step="0.01" required>
+                                    <div class="invalid-feedback">O preço deve ser entre 0.01 e 999.99.</div>
+                                }
+                                else
+                                {
+                                    @produto.Preco
+                                }
+                            </td>
+                            <td>
+                                @if (produto.Plu == produtoEmEdicao?.Plu)
+                                {
+                                    <select @bind="produtoEmEdicao.Venda" class="form-control">
+                                        <option value="0">Pesavel</option>
+                                        <option value="1">Unitario</option>
+                                    </select>
+                                }
+                                else
+                                {
+                                    @(produto.Venda == 1 ? "Unitario" : "Pesavel")
+                                }
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center">
+                                @if (produto.Plu == produtoEmEdicao?.Plu)
+                                {
+                                    <input @bind="produtoEmEdicao.Validade" class="form-control @(produtoEmEdicao.Validade < 0 || produtoEmEdicao.Validade > 200 ? "is-invalid" : "is-valid")"
+                                           style="width: 6rem;" type="number" min="0" max="200" required>
+                                    <div class="invalid-feedback">A validade deve estar entre 0 e 200.</div>
+                                }
+                                else
+                                {
+                                    @produto.Validade
+                                }
+                                </div>
+                            </td>
+                            <td>
+                                <button @onclick="() => Excluir(produto.Plu)" class="btn btn-danger">
+                                    <i class="bi bi-trash2-fill"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+
+                </tbody>
+
+            </table>
+        </section>
+    </div>
+    <br>
+</body>
+
+@code {
+    private string searchPluDescription;
+    private int searchPlu;
+    private bool showNewPlu = false;
+    private List<Produto> produtos = new List<Produto>();
+
+    // Variável para armazenar o produto que está sendo editado
+    private Produto produtoEmEdicao;
+
+    // Novos valores para inserir
+    private int newPlu;
+    private string newDescricao;
+    private double newPreco;
+    private int newVenda;
+    private int newValidade;
+    private bool formularioValido = true;
+    private bool formularioNewValido = true;
+
+    private async Task Editar(Produto produto)
+    {
+        // Define o produto que será editado
+        produtoEmEdicao = new Produto
+            {
+                Plu = produto.Plu,
+                Descricao = produto.Descricao,
+                Preco = produto.Preco,
+                Venda = produto.Venda,
+                Validade = produto.Validade
+            };
+    }
+
+    private void ValidarFormulario()
+    {
+        formularioValido = true; // Começa assumindo que o formulário está válido
+
+        // Verifica a descrição
+        if (string.IsNullOrWhiteSpace(produtoEmEdicao.Descricao))
+        {
+            formularioValido = false;
+        }
+
+        // Verifica o preço
+        if (produtoEmEdicao.Preco <= 0 || produtoEmEdicao.Preco > 999.99)
+        {
+            formularioValido = false;
+        }
+
+        // Verifica a validade
+        if (produtoEmEdicao.Validade < 0 || produtoEmEdicao.Validade > 200)
+        {
+            formularioValido = false;
+        }
+
+        // Se qualquer campo estiver inválido, a variável formularioValido será false
+    }
+
+    private void ValidarFormularioNewPlu()
+    {
+        formularioNewValido = true; // Começa assumindo que o formulário está válido
+
+        // Verifica a descrição
+        if(newPlu <= 0 || newPlu > 200)
+        {
+            formularioNewValido = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(newDescricao))
+        {
+            formularioNewValido = false;
+        }
+
+        // Verifica o preço
+        if (newPreco <= 0 || newPreco > 999.99)
+        {
+            formularioNewValido = false;
+        }
+
+        // Verifica a validade
+        if (newValidade < 0 || newValidade > 200)
+        {
+            formularioNewValido = false;
+        }
+        // Se qualquer campo estiver inválido, a variável formularioValido será false
+    }
+
+    private async Task SalvarEdicao(int plu)
+    {
+        ValidarFormulario();
+        if (produtoEmEdicao != null && formularioValido)
+        {
+            // Atualiza o produto no banco de dados
+            await _databaseService.EditarProdutoAsync(produtoEmEdicao);
+
+            // Recarrega a lista de produtos
+            await CarregarProdutosDoBanco();
+
+            // Limpa o produto em edição
+            produtoEmEdicao = null;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarProdutosDoBanco();
+    }
+
+    private async Task CarregarProdutosDoBanco()
+    {
+        try
+        {
+            produtos = await _databaseService.GetAllProdutosAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Erro ao carregar produtos: {ex.Message}");
+        }
+    }
+
+    private async Task ScrollToId()
+    {
+        if (module != null) // Verifica se o módulo JavaScript foi carregado
+        {
+            await module.InvokeVoidAsync("scrollToId"); // Chama a função JavaScript
+        }
+    }
+
+    private async Task OnSearchInputChanged(string searchText)
+    {
+        searchPluDescription = searchText; // Atualiza a variável local
+
+        if (module != null) // Verifica se o módulo JavaScript foi carregado
+        {
+            await module.InvokeVoidAsync("filterProductsByDescription");
+        }
+    }
+
+
+    private void ExibeNew()
+    {
+        showNewPlu = !showNewPlu;
+    }
+
+    private async Task SalvarNovo()
+    {
+        ValidarFormularioNewPlu();
+        if (formularioNewValido)
+        {        
+        var novoProduto = new Produto
+            {
+                Plu = newPlu,
+                Descricao = newDescricao.ToUpper(),
+                Preco = newPreco,
+                Venda = newVenda,
+                Validade = newValidade
+            };
+
+        await _databaseService.InsertIntoProdutosAsync(novoProduto); // Altere para o método correto
+        await CarregarProdutosDoBanco(); // Atualiza a lista de produtos
+        LimparCamposNovos(); // Limpa os campos após salvar
+        }
+       }
+
+    private void LimparCamposNovos()
+    {
+        newPlu = 0;
+        newDescricao = string.Empty;
+        newPreco = 0;
+        newVenda = 0;
+        newValidade = 0;
+    }
+
+    private async Task Excluir(int plu)
+    {
+        await _databaseService.ExcluirProdutoAsync(plu);
+        await CarregarProdutosDoBanco();
+    }
+
+    private IJSObjectReference module;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Carrega o módulo JavaScript na primeira renderização
+            module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./Components/Pages/Home.razor.js");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Descarrega o módulo JavaScript quando o componente for destruído
+        if (module != null)
+        {
+            await module.DisposeAsync();
+        }
+    }
+}

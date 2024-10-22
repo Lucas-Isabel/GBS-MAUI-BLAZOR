@@ -1,0 +1,27 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35327.3
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IMPORTADOR CLIPSE", "IMPORTADOR CLIPSE.csproj", "{DB4A08C4-16B4-404B-86AC-5E46646C85EA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DB4A08C4-16B4-404B-86AC-5E46646C85EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB4A08C4-16B4-404B-86AC-5E46646C85EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB4A08C4-16B4-404B-86AC-5E46646C85EA}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{DB4A08C4-16B4-404B-86AC-5E46646C85EA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB4A08C4-16B4-404B-86AC-5E46646C85EA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB4A08C4-16B4-404B-86AC-5E46646C85EA}.Release|Any CPU.Deploy.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EA614B96-9E94-45DB-B5DA-00E90B586364}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,131 @@
+﻿@page "/importar-itens-exemplo"
+@inject ImportController ImportController
+@using IMPORTADOR_CLIPSE.Controllers
+@using IMPORTADOR_CLIPSE.Models
+
+<body class="bg-dark font-weight-light text-white">
+    <br />
+    <div class="container card bg-dark">
+        <br />
+        <div class="jumbotron jumbotron-fluid bg-primary mb-0">
+            <div class="container">
+                <h1 class="display-5">Importação dos Dados</h1>
+            </div>
+        </div>
+        <div class="jumbotron jumbotron-fluid bg-dark mb-0">
+            <div class="container">
+                <p class="display-8">Ajuste a configuração e faça o envio dos dados</p>
+                <h3 class="display-8">Data do envio anterior: <span id="data">{{.EventDate}}</span></h3>
+            </div>
+        </div>
+
+        <form id="importForm" method="POST" action="send">
+            <div class="row">
+                <div class="col-sm-8">
+                    <div class="form-group">
+                        <label for="tipoDeArquivo">Tipo de Arquivo:</label>
+                        <select @bind="tipoDeArquivo" class="form-control" id="tipoDeArquivo">
+                            <option value="MGV">Itens MGV</option>
+                            <option value="OutroTipo">Outro Tipo</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-8">
+                    <div class="form-group">
+                        <label for="arquivo">Selecionar Arquivo:</label>
+                        <InputFile OnChange="OnFileSelected" class="form-control" />
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-2">
+                    <div class="form-group">
+                        <button type="button" class="btn btn-success" @onclick="ImportarItens">Importar</button>
+                        <a class="btn btn-info" href="/">Voltar</a>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        @if (produtos != null && produtos.Count > 0)
+        {
+            <h4>Produtos Importados:</h4>
+            <ul>
+                @foreach (var produto in produtos)
+                {
+                    <li>@produto.Plu - @produto.Descricao - @produto.Preco.ToString("C")</li>
+                }
+            </ul>
+        }
+        else if (produtos != null)
+        {
+            <p>Nenhum produto foi importado.</p>
+        }
+
+        <div class="progress-bar mt-3" style="display:none; width: 100%; background-color: #f3f3f3; border-radius: 4px;">
+            <div class="progress bg-primary" id="progress" style="width: 0%; height: 24px; text-align: center; line-height: 24px; color: white;">0%</div>
+        </div>
+
+        <div class="cronometro">
+            <div class="tempo" id="tempo">00:00:00</div>
+        </div>
+
+        <p id="status" style="color: white;"><span id="ellipsis"></span></p>
+
+        <br />
+    </div>
+    <br />
+</body>
+
+@code {
+    private List<Produto> produtos = new();
+    private string caminhoArquivo;
+    private string tipoDeArquivo = "MGV";
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            var path = Path.Combine(Path.GetTempPath(), file.Name);
+            using (var stream = file.OpenReadStream())
+            using (var fileStream = new FileStream(path, FileMode.Create))
+            {
+                await stream.CopyToAsync(fileStream);
+            }
+            caminhoArquivo = path;
+        }
+    }
+
+    private async Task ImportarItens()
+    {
+        if (!string.IsNullOrEmpty(caminhoArquivo))
+        {
+            try
+            {
+                var servico = ImportController.ObterServicoPorTipoDeArquivo(tipoDeArquivo);
+                produtos = await servico.LerItensDoArquivoAsync(caminhoArquivo);
+
+                if (produtos != null && produtos.Count > 0)
+                {
+                    await servico.ProcessarProdutosAsync(produtos);
+                }
+                else
+                {
+                    produtos = new List<Produto>(); // Limpa a lista se nenhum produto for encontrado
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao importar itens: {ex.Message}");
+                // Aqui você pode mostrar uma mensagem de erro para o usuário
+            }
+        }
+        else
+        {
+            Console.WriteLine("Nenhum arquivo selecionado.");
+        }
+    }
+}

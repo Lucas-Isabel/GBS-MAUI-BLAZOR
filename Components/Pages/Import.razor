@@ -1,0 +1,207 @@
+﻿@page "/import"
+@inject IJSRuntime JSRuntime
+@inject SerialPortService SerialService
+
+<body class="bg-dark font-weight-light text-white">
+    <br>
+    <div class="container card bg-dark">
+        <br>
+
+        <!-- Cabeçalho de importação -->
+        <div class="jumbotron jumbotron-fluid bg-primary mb-0">
+            <div class="container">
+                <h1 class="display-5 strong-50">Importação dos Dados</h1>
+            </div>
+        </div>
+        <label class="strong-50">Ajuste a configuração e faça o envio dos dados</label>
+
+        <!-- Formulário de configuração -->
+        <form id="importForm">
+            <div class="row">
+                <div class="col-sm-8">
+                    <div class="form-group">
+                        <label for="porta">Porta:</label>
+                        <input id="porta" class="form-control" placeholder="Digite o número da porta" type="text" @bind-value="portaNumero" @oninput="OnPortaInput" />
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="row">
+                <div class="col-sm-8">
+                    <div class="form-group">
+                        <label for="velocidade">Velocidade:</label>
+                        <select @bind="velocidade" class="form-control" id="velocidade-select">
+                            <option value="9600">9600</option>
+                            <option value="115200">115200</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-8">
+                    <div class="form-group">
+                        <label for="tipo">Tipo de Importação:</label>
+                        <select @bind="tipo" class="form-control" id="import-select">
+                            <option value="1">Somente novidades (recomendado)</option>
+                            <option value="2">Completo</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group mb-3" data-bs-toggle="buttons">
+                <label class="btn btn-warning">
+                    <input type="radio" name="excluiProduto" value="true" @onchange="() => excluiProduto = true" autocomplete="off">
+                    Apagar produtos que não estão no programa
+                </label>
+                <label class="btn btn-info">
+                    <input type="radio" name="excluiProduto" value="false" @onchange="() => excluiProduto = false" autocomplete="on" checked>
+                    Apenas enviar os produtos
+                </label>
+            </div>
+
+
+            <div class="row">
+                <div class="col-sm-2">
+                    <div class="form-group d-flex">
+                        <button type="button" class="btn btn-success" @onclick="IniciarImportacao">Iniciar Importação</button>
+                        <a class="btn btn-info" style="margin-left: 4px;" href="/">Voltar</a>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <!-- Barra de progresso -->
+        @if (emProgresso)
+        {
+            <div class="progress-bar mt-3" style="width: 100%; background-color: #fff; border-radius: 25rem; padding: 2px">
+                <div class="progress bg-primary d-flex justify-content-center" style="width: @progresso%; height: 24px; text-align: center; line-height: 24px; color: white;">
+                    <span class="strong">@progresso %</span>
+                </div>
+            </div>
+        }
+
+        <!-- Mensagens de status -->
+        @if (completo && string.IsNullOrEmpty(mensagemErro))
+        {
+            <div class="alert alert-success" role="alert">
+                Importação Completa!
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(mensagemErro))
+        {
+            <div class="alert alert-danger" role="alert">
+                @mensagemErro
+            </div>
+        }
+
+
+        <p id="status" style="color: white;"><span id="ellipsis"></span></p>
+        <br>
+    </div>
+    <br>
+</body>
+
+@code {
+    private string portaNumero;
+    private string porta;
+    private int velocidade = 9600;
+    private int tipo = 1;
+    private bool excluiProduto = false;
+    private bool emProgresso = false;
+    private bool completo = false;
+    private double progresso = 0;
+    private string mensagemErro = "";
+
+    private IJSObjectReference module;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Carrega o módulo JavaScript na primeira renderização
+            module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./Components/Pages/Import.razor.js");
+            // Registrar o evento de confirmação ao tentar sair da página
+        }
+    }
+
+    // Função para atualizar a porta com "COM" + número digitado
+    private void OnPortaInput(ChangeEventArgs e)
+    {
+        // Verifica se o valor digitado contém apenas números
+        if (int.TryParse(e.Value?.ToString(), out int numeroPorta))
+        {
+            portaNumero = numeroPorta.ToString();
+            porta = "COM" + portaNumero;
+        }
+        else
+        {
+            portaNumero = string.Empty;
+            porta = string.Empty;
+        }
+    }
+
+
+    private async Task IniciarImportacao()
+    {
+        emProgresso = true;
+        completo = false;
+        mensagemErro = "";
+        progresso = 0;
+
+        try
+        {
+            SerialService.OnProgress += AtualizarProgresso;
+            SerialService.OnComplete += FinalizarImportacao;
+            SerialService.OnError += ExibirErro;
+
+            SerialService.ConfigurarPortaEVelocidade(porta, velocidade);
+
+            using (var cts = new CancellationTokenSource())
+            {
+                // Passar o tipo para o método
+                await SerialService.EnviarDadosAsync(cts.Token, tipo, excluiProduto);
+            }
+        }
+        catch (Exception ex)
+        {
+            ExibirErro($"Erro: {ex.Message}");
+        }
+        finally
+        {
+            SerialService.OnProgress -= AtualizarProgresso;
+            SerialService.OnComplete -= FinalizarImportacao;
+            SerialService.OnError -= ExibirErro;
+        }
+    }
+
+    private void AtualizarProgresso(double valor)
+    {
+        progresso = Math.Min(valor, 100);
+        progresso = (int)progresso;
+        if (progresso >= 99)
+        {
+            SerialService.Finalizado();
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void FinalizarImportacao(bool sucesso)
+    {
+        emProgresso = false;
+        completo = sucesso;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ExibirErro(string mensagem)
+    {
+        emProgresso = false;
+        mensagemErro = mensagem;
+        InvokeAsync(StateHasChanged);
+    }
+
+}
+

@@ -1,0 +1,108 @@
+﻿@page "/envioteste"
+@inject SerialPortService SerialService
+
+<h3>Importação de Dados</h3>
+
+<div>
+    <label for="porta">Porta:</label>
+    <input @bind="porta" id="porta" type="text" />
+</div>
+
+<div>
+    <label for="velocidade">Velocidade:</label>
+    <select @bind="velocidade">
+        <option value="9600">9600</option>
+        <option value="115200">115200</option>
+    </select>
+</div>
+
+<div>
+    <label for="tipo">Tipo de Importação:</label>
+    <select @bind="tipo">
+        <option value="1">Código Faltante</option>
+        <option value="2">Completo</option>
+    </select>
+</div>
+
+<button @onclick="IniciarImportacao" class="btn btn-primary">Iniciar Importação</button>
+
+@if (emProgresso)
+{
+    <p>Progresso: @progresso %</p>
+    <div class="loader">
+        <div class="progress-bar" style="width: @progresso%"></div>
+    </div>
+}
+
+@if (completo)
+{
+    <p style="color:green">Importação Completa!</p>
+}
+
+@if (!string.IsNullOrEmpty(mensagemErro))
+{
+    <p style="color:red">@mensagemErro</p>
+}
+
+@code {
+    private string porta;
+    private int velocidade = 9600;
+    private int tipo = 1;
+    private bool emProgresso = false;
+    private bool completo = false;
+    private double progresso = 0;
+    private string mensagemErro = "";
+
+    private async Task IniciarImportacao()
+    {
+        emProgresso = true;
+        completo = false;
+        mensagemErro = "";
+        progresso = 0;
+
+        try
+        {
+            SerialService.OnProgress += AtualizarProgresso;
+            SerialService.OnComplete += FinalizarImportacao;
+            SerialService.OnError += ExibirErro;
+
+            SerialService.ConfigurarPortaEVelocidade(porta, velocidade);
+
+            using (var cts = new CancellationTokenSource())
+            {
+                await SerialService.EnviarDadosAsync(cts.Token, tipo);
+            }
+        }
+        catch (Exception ex)
+        {
+            ExibirErro($"Erro: {ex.Message}");
+        }
+        finally
+        {
+            SerialService.OnProgress -= AtualizarProgresso;
+            SerialService.OnComplete -= FinalizarImportacao;
+            SerialService.OnError -= ExibirErro;
+        }
+    }
+
+    private void AtualizarProgresso(double valor)
+    {
+        progresso = Math.Min(valor, 100);
+        progresso = (int)progresso;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void FinalizarImportacao(bool sucesso)
+    {
+        emProgresso = false;
+        completo = sucesso;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ExibirErro(string mensagem)
+    {
+        emProgresso = false;
+        mensagemErro = mensagem;
+        InvokeAsync(StateHasChanged);
+    }
+}
